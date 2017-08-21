@@ -35,7 +35,7 @@
 
 #include <systemd/sd-bus.h>
 
-static const char *bt_bmc_device = "/dev/ipmi-bt-host";
+static const char *bt_bmc_device = "/dev/ssif_slave";
 
 #define PREFIX "BTBRIDGED"
 

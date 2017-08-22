@@ -518,12 +518,11 @@ static int dispatch_bt(struct btbridged_context *context)
 			goto out1;
 		}
 		if (new == bt_q_get_head(context)) {
-			//struct itimerspec ts;
+			struct itimerspec ts;
 			/*
 			 * Enqueued onto an empty list, setup a timer for sending a
-			 * timeout  TODO!!
+			 * timeout
 			 */
-#if 0
 			ts.it_interval.tv_sec = 0;
 			ts.it_interval.tv_nsec = 0;
 			ts.it_value.tv_nsec = 0;
@@ -531,9 +530,8 @@ static int dispatch_bt(struct btbridged_context *context)
 			r = timerfd_settime(context->fds[TIMER_FD].fd, 0, &ts, NULL);
 			if (r == -1)
 				printf("Couldn't set timerfd\n");
-#endif
 		}
-
+		printf("bridge msg :%d %d %d %d \n",msg.len, msg.netfn_lun, msg.seq_num, msg.cmd );
 		r = sd_bus_message_new_signal(context->bus, &msg, OBJ_NAME, DBUS_NAME, "ReceivedMessage");
 		if (r < 0) {
 			printf("Failed to create signal: %s\n", strerror(-r));

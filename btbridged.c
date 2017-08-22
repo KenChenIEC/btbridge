@@ -519,7 +519,7 @@ static int dispatch_bt(struct btbridged_context *context)
 			goto out1;
 		}
 		if (new == bt_q_get_head(context)) {
-			struct itimerspec ts;
+			//struct itimerspec ts;
 			/*
 			 * Enqueued onto an empty list, setup a timer for sending a
 			 * timeout  TODO!!

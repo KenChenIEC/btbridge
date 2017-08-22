@@ -156,7 +156,7 @@ static struct bt_queue *bt_q_enqueue(struct btbridged_context *context, uint8_t 
 	 */
 	len = bt_data[0] + 1;
 	if (len < 4) {
-		MSG_ERR("Trying to queue a BT message with a short length (%d)\n", len);
+		printf("Trying to queue a BT message with a short length (%d)\n", len);
 		return NULL;
 	}
 
@@ -179,7 +179,7 @@ static struct bt_queue *bt_q_enqueue(struct btbridged_context *context, uint8_t 
 	n->req.cmd = bt_data[3];
 #if 0
 	if (clock_gettime(CLOCK_MONOTONIC, &n->start) == -1) {
-		MSG_ERR("Couldn't clock_gettime(): %s\n", strerror(errno));
+		printf("Couldn't clock_gettime(): %s\n", strerror(errno));
 		free(n);
 		return NULL;
 	}
@@ -228,7 +228,7 @@ static struct bt_queue *bt_q_drop(struct btbridged_context *context, struct bt_q
 			r = r->next;
 
 		if (!r) {
-			MSG_ERR("Didn't find element %p in queue\n", element);
+			printf("Didn't find element %p in queue\n", element);
 			bt_q_free(element);
 			return NULL;
 		}
@@ -248,7 +248,7 @@ static struct bt_queue *bt_q_dequeue(struct btbridged_context *context)
 
 	bt_q = context->bt_q;
 	if (!bt_q) {
-		MSG_ERR("Dequeuing empty queue!\n");
+		printf("Dequeuing empty queue!\n");
 		return NULL;
 	}
 
@@ -265,13 +265,13 @@ static int method_send_sms_atn(sd_bus_message *msg, void *userdata,
 	int r;
 	struct btbridged_context *bt_fd = userdata;
 
-	MSG_OUT("Sending SMS_ATN ioctl (%d) to %s\n",
+	printf("Sending SMS_ATN ioctl (%d) to %s\n",
 			BT_BMC_IOCTL_SMS_ATN, BT_BMC_PATH);
 
 	r = ioctl(bt_fd->fds[BT_FD].fd, BT_BMC_IOCTL_SMS_ATN);
 	if (r == -1) {
 		r = errno;
-		MSG_ERR("Couldn't ioctl() to 0x%x, %s: %s\n", bt_fd->fds[BT_FD].fd, BT_BMC_PATH, strerror(r));
+		printf("Couldn't ioctl() to 0x%x, %s: %s\n", bt_fd->fds[BT_FD].fd, BT_BMC_PATH, strerror(r));
 		return sd_bus_reply_method_errno(msg, errno, ret_error);
 	}
 
@@ -301,14 +301,14 @@ static int method_send_message(sd_bus_message *msg, void *userdata, sd_bus_error
 	}
 	r = sd_bus_message_read(msg, "yyyyy", &seq, &netfn, &lun, &cmd, &cc);
 	if (r < 0) {
-		MSG_ERR("Couldn't parse leading bytes of message: %s\n", strerror(-r));
+		printf("Couldn't parse leading bytes of message: %s\n", strerror(-r));
 		sd_bus_error_set_const(ret_error, "org.openbmc.error", "Bad message");
 		r = -EINVAL;
 		goto out;
 	}
 	r = sd_bus_message_read_array(msg, 'y', (const void **)&data, &data_sz);
 	if (r < 0) {
-		MSG_ERR("Couldn't parse data bytes of message: %s\n", strerror(-r));
+		printf("Couldn't parse data bytes of message: %s\n", strerror(-r));
 		sd_bus_error_set_const(ret_error, "org.openbmc.error", "Bad message data");
 		r = -EINVAL;
 		goto out;
@@ -317,11 +317,11 @@ static int method_send_message(sd_bus_message *msg, void *userdata, sd_bus_error
 	bt_msg = bt_q_get_seq(context, seq);
 	if (!bt_msg) {
 		sd_bus_error_set_const(ret_error, "org.openbmc.error", "No matching request");
-		MSG_ERR("Failed to find matching request for dbus method with seq: 0x%02x\n", seq);
+		printf("Failed to find matching request for dbus method with seq: 0x%02x\n", seq);
 		r = -EINVAL;
 		goto out;
 	}
-	MSG_OUT("Received a dbus response for msg with seq 0x%02x\n", seq);
+	printf("Received a dbus response for msg with seq 0x%02x\n", seq);
 	bt_msg->call = sd_bus_message_ref(msg);
 	bt_msg->rsp.netfn = netfn;
 	bt_msg->rsp.lun = lun;
@@ -361,22 +361,22 @@ static int bt_host_write(struct btbridged_context *context, struct bt_queue *bt_
 		if (head->next) {
 			ts.it_value = head->next->start;
 			ts.it_value.tv_sec += BT_BMC_TIMEOUT_SEC;
-			MSG_OUT("Adjusting timer for next element\n");
+			printf("Adjusting timer for next element\n");
 		} else {
 			ts.it_value.tv_nsec = 0;
 			ts.it_value.tv_sec = 0;
-			MSG_OUT("Disabling timer, no elements remain in queue\n");
+			printf("Disabling timer, no elements remain in queue\n");
 		}
 		r = timerfd_settime(context->fds[TIMER_FD].fd, TFD_TIMER_ABSTIME, &ts, NULL);
 		if (r == -1)
-			MSG_ERR("Couldn't set timerfd\n");
+			printf("Couldn't set timerfd\n");
 	}
 	data[1] = (bt_msg->rsp.netfn << 2) | (bt_msg->rsp.lun & 0x3);
 	data[2] = bt_msg->rsp.seq;
 	data[3] = bt_msg->rsp.cmd;
 	data[4] = bt_msg->rsp.cc;
 	if (bt_msg->rsp.data_len > sizeof(data) - 5) {
-		MSG_ERR("Response message size (%zu) too big, truncating\n", bt_msg->rsp.data_len);
+		printf("Response message size (%zu) too big, truncating\n", bt_msg->rsp.data_len);
 		bt_msg->rsp.data_len = sizeof(data) - 5;
 	}
 	/* netfn/len + seq + cmd + cc = 4 */
@@ -387,29 +387,29 @@ static int bt_host_write(struct btbridged_context *context, struct bt_queue *bt_
 	len = write(context->fds[BT_FD].fd, data, data[0] + 1);
 	if (len == -1) {
 		r = errno;
-		MSG_ERR("Error writing to %s: %s\n", BT_BMC_PATH, strerror(errno));
+		printf("Error writing to %s: %s\n", BT_BMC_PATH, strerror(errno));
 		if (bt_msg->call) {
 			r = sd_bus_message_new_method_errno(bt_msg->call, &msg, r, NULL);
 			if (r < 0)
-				MSG_ERR("Couldn't create response error\n");
+				printf("Couldn't create response error\n");
 		}
 		goto out;
 	} else {
 		if (len != data[0] + 1)
-			MSG_ERR("Possible short write to %s, desired len: %d, written len: %d\n", BT_BMC_PATH, data[0] + 1, len);
+			printf("Possible short write to %s, desired len: %d, written len: %d\n", BT_BMC_PATH, data[0] + 1, len);
 		else
-			MSG_OUT("Successfully wrote %d of %d bytes to %s\n", len, data[0] + 1, BT_BMC_PATH);
+			printf("Successfully wrote %d of %d bytes to %s\n", len, data[0] + 1, BT_BMC_PATH);
 
 		if (bt_msg->call) {
 			r = sd_bus_message_new_method_return(bt_msg->call, &msg);
 			if (r < 0) {
-				MSG_ERR("Couldn't create response message\n");
+				printf("Couldn't create response message\n");
 				goto out;
 			}
 			r = 0; /* Just to be explicit about what we're sending back */
 			r = sd_bus_message_append(msg, "x", r);
 			if (r < 0) {
-				MSG_ERR("Couldn't append result to response\n");
+				printf("Couldn't append result to response\n");
 				goto out;
 			}
 
@@ -419,7 +419,7 @@ static int bt_host_write(struct btbridged_context *context, struct bt_queue *bt_
 out:
 	if (bt_msg->call) {
 		if (sd_bus_send(context->bus, msg, NULL) < 0)
-			MSG_ERR("Couldn't send response message\n");
+			printf("Couldn't send response message\n");
 		sd_bus_message_unref(msg);
 	}
 	bt_q_drop(context, bt_msg);
@@ -428,7 +428,7 @@ out:
 	 * There isn't another message ready to be sent so turn off POLLOUT
 	 */
 	if (!bt_q_get_msg(context)) {
-		MSG_OUT("Turning off POLLOUT for the BT in poll()\n");
+		printf("Turning off POLLOUT for the BT in poll()\n");
 		context->fds[BT_FD].events = POLLIN;
 	}
 
@@ -446,19 +446,19 @@ static int dispatch_timer(struct btbridged_context *context)
 		head = bt_q_get_head(context);
 		if (!head) {
 			/* Odd, timer expired but we didn't have a message to timeout */
-			MSG_ERR("No message found to send timeout\n");
+			printf("No message found to send timeout\n");
 			return 0;
 		}
 		if (head->call) {
 			r = sd_bus_message_new_method_errno(head->call, &msg, ETIMEDOUT, NULL);
 			if (r < 0) {
-				MSG_ERR("Couldn't create response error\n");
+				printf("Couldn't create response error\n");
 			} else {
 				if (sd_bus_send(context->bus, msg, NULL) < 0)
-					MSG_ERR("Couldn't send response message\n");
+					printf("Couldn't send response message\n");
 				sd_bus_message_unref(msg);
 			}
-			MSG_ERR("Message with seq 0x%02x is being timed out despite "
+			printf("Message with seq 0x%02x is being timed out despite "
 					"appearing to have been responded to. Slow BT?\n", head->rsp.seq);
 		}
 
@@ -473,7 +473,7 @@ static int dispatch_timer(struct btbridged_context *context)
 		head->rsp.data_len = 0;
 		head->rsp.data = NULL;
 		head->call = NULL;
-		MSG_OUT("Timeout on msg with seq: 0x%02x\n", head->rsp.seq);
+		printf("Timeout on msg with seq: 0x%02x\n", head->rsp.seq);
 		/* Turn on POLLOUT so we'll write this one next */
 		context->fds[BT_FD].events |= POLLOUT;
 	}
@@ -488,7 +488,7 @@ static int dispatch_sd_bus(struct btbridged_context *context)
 	if (context->fds[SD_BUS_FD].revents) {
 		r = sd_bus_process(context->bus, NULL);
 		if (r > 0)
-			MSG_OUT("Processed %d dbus events\n", r);
+			printf("Processed %d dbus events\n", r);
 	}
 
 	return r;
@@ -508,11 +508,11 @@ static int dispatch_bt(struct btbridged_context *context)
 
 		r = read(context->fds[BT_FD].fd, data, sizeof(data));
 		if (r < 0) {
-			MSG_ERR("Couldn't read from bt: %s\n", strerror(-r));
+			printf("Couldn't read from bt: %s\n", strerror(-r));
 			goto out1;
 		}
 		if (r < data[0] + 1) {
-			MSG_ERR("Short read from bt (%d vs %d)\n", r, data[0] + 1);
+			printf("Short read from bt (%d vs %d)\n", r, data[0] + 1);
 			r = 0;
 			goto out1;
 		}
@@ -535,29 +535,29 @@ static int dispatch_bt(struct btbridged_context *context)
 			ts.it_value.tv_sec = BT_BMC_TIMEOUT_SEC;
 			r = timerfd_settime(context->fds[TIMER_FD].fd, 0, &ts, NULL);
 			if (r == -1)
-				MSG_ERR("Couldn't set timerfd\n");
+				printf("Couldn't set timerfd\n");
 #endif
 		}
 
 		r = sd_bus_message_new_signal(context->bus, &msg, OBJ_NAME, DBUS_NAME, "ReceivedMessage");
 		if (r < 0) {
-			MSG_ERR("Failed to create signal: %s\n", strerror(-r));
+			printf("Failed to create signal: %s\n", strerror(-r));
 			goto out1;
 		}
 
 		r = sd_bus_message_append(msg, "yyyy", new->req.seq, new->req.netfn, new->req.lun, new->req.cmd);
 		if (r < 0) {
-			MSG_ERR("Couldn't append to signal: %s\n", strerror(-r));
+			printf("Couldn't append to signal: %s\n", strerror(-r));
 			goto out1_free;
 		}
 
 		r = sd_bus_message_append_array(msg, 'y', data + 4, new->req.data_len);
 		if (r < 0) {
-			MSG_ERR("Couldn't append array to signal: %s\n", strerror(-r));
+			printf("Couldn't append array to signal: %s\n", strerror(-r));
 			goto out1_free;
 		}
 
-		MSG_OUT("Sending dbus signal with seq 0x%02x, netfn 0x%02x, lun 0x%02x, cmd 0x%02x\n",
+		printf("Sending dbus signal with seq 0x%02x, netfn 0x%02x, lun 0x%02x, cmd 0x%02x\n",
 				new->req.seq, new->req.netfn, new->req.lun, new->req.cmd);
 
 		if (verbosity == BT_LOG_DEBUG) {
@@ -566,7 +566,7 @@ static int dispatch_bt(struct btbridged_context *context)
 				if (i % 8 == 0) {
 					if (i)
 						printf("\n");
-					MSG_OUT("\t");
+					printf("\t");
 				}
 				printf("0x%02x ", data[i + 4]);
 			}
@@ -577,7 +577,7 @@ static int dispatch_bt(struct btbridged_context *context)
 		/* Note we only actually keep the request data in the queue when debugging */
 		r = sd_bus_send(context->bus, msg, NULL);
 		if (r < 0) {
-			MSG_ERR("Couldn't emit dbus signal: %s\n", strerror(-r));
+			printf("Couldn't emit dbus signal: %s\n", strerror(-r));
 			goto out1_free;
 		}
 		r = 0;
@@ -592,17 +592,17 @@ out1:
 		bt_msg = bt_q_get_msg(context);
 		if (!bt_msg) {
 			/* Odd, this shouldn't really happen */
-			MSG_ERR("Got a POLLOUT but no message is ready to be written\n");
+			printf("Got a POLLOUT but no message is ready to be written\n");
 			r = 0;
 			goto out;
 		}
 		r = bt_host_write(context, bt_msg);
 		if (r < 0)
-			MSG_ERR("Problem putting request with seq 0x%02x, netfn 0x%02x, lun 0x%02x, cmd 0x%02x, cc 0x%02x\n"
+			printf("Problem putting request with seq 0x%02x, netfn 0x%02x, lun 0x%02x, cmd 0x%02x, cc 0x%02x\n"
 					"out to %s", bt_msg->rsp.seq, bt_msg->rsp.netfn, bt_msg->rsp.lun,
 					bt_msg->rsp.cmd, bt_msg->rsp.cc, BT_BMC_PATH);
 		else
-			MSG_OUT("Completed request with seq 0x%02x, netfn 0x%02x, lun 0x%02x, cmd 0x%02x, cc 0x%02x\n",
+			printf("Completed request with seq 0x%02x, netfn 0x%02x, lun 0x%02x, cmd 0x%02x, cc 0x%02x\n",
 					bt_msg->rsp.seq, bt_msg->rsp.netfn, bt_msg->rsp.lun, bt_msg->rsp.cmd, bt_msg->rsp.cc);
 	}
 out:
@@ -643,6 +643,7 @@ int main(int argc, char *argv[]) {
 
 	context = calloc(1, sizeof(*context));
 
+	printf("test point main\n");
 	bt_vlog = &bt_log_console;
 	while ((opt = getopt_long(argc, argv, "", long_options, NULL)) != -1) {
 		switch (opt) {
@@ -665,19 +666,19 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (verbosity == BT_LOG_VERBOSE)
-		MSG_OUT("Verbose logging\n");
+		printf("Verbose logging\n");
 
 	if (verbosity == BT_LOG_DEBUG)
-		MSG_OUT("Debug logging\n");
+		printf("Debug logging\n");
 
-	MSG_OUT("Starting\n");
+	printf("Starting\n");
 	r = sd_bus_default_system(&context->bus);
 	if (r < 0) {
-		MSG_ERR("Failed to connect to system bus: %s\n", strerror(-r));
+		printf("Failed to connect to system bus: %s\n", strerror(-r));
 		goto finish;
 	}
 
-	MSG_OUT("Registering dbus methods/signals\n");
+	printf("Registering dbus methods/signals\n");
 	r = sd_bus_add_object_vtable(context->bus,
 	                             NULL,
 	                             OBJ_NAME,
@@ -685,45 +686,45 @@ int main(int argc, char *argv[]) {
 	                             ipmid_vtable,
 	                             context);
 	if (r < 0) {
-		MSG_ERR("Failed to issue method call: %s\n", strerror(-r));
+		printf("Failed to issue method call: %s\n", strerror(-r));
 		goto finish;
 	}
 
-	MSG_OUT("Requesting dbus name: %s\n", DBUS_NAME);
+	printf("Requesting dbus name: %s\n", DBUS_NAME);
 	r = sd_bus_request_name(context->bus, DBUS_NAME, SD_BUS_NAME_ALLOW_REPLACEMENT|SD_BUS_NAME_REPLACE_EXISTING);
 	if (r < 0) {
-		MSG_ERR("Failed to acquire service name: %s\n", strerror(-r));
+		printf("Failed to acquire service name: %s\n", strerror(-r));
 		goto finish;
 	}
 
-	MSG_OUT("Getting dbus file descriptors\n");
+	printf("Getting dbus file descriptors\n");
 	context->fds[SD_BUS_FD].fd = sd_bus_get_fd(context->bus);
 	if (context->fds[SD_BUS_FD].fd < 0) {
 		r = -errno;
-		MSG_OUT("Couldn't get the bus file descriptor: %s\n", strerror(errno));
+		printf("Couldn't get the bus file descriptor: %s\n", strerror(errno));
 		goto finish;
 	}
 
-	MSG_OUT("Opening %s\n", BT_BMC_PATH);
+	printf("Opening %s\n", BT_BMC_PATH);
 	context->fds[BT_FD].fd = open(BT_BMC_PATH, O_RDWR | O_NONBLOCK);
 	if (context->fds[BT_FD].fd < 0) {
 		r = -errno;
-		MSG_ERR("Couldn't open %s with flags O_RDWR: %s\n", BT_BMC_PATH, strerror(errno));
+		printf("Couldn't open %s with flags O_RDWR: %s\n", BT_BMC_PATH, strerror(errno));
 		goto finish;
 	}
 
-	MSG_OUT("Creating timer fd\n");
+	printf("Creating timer fd\n");
 	context->fds[TIMER_FD].fd = timerfd_create(CLOCK_MONOTONIC, 0);
 	if (context->fds[TIMER_FD].fd < 0) {
 		r = -errno;
-		MSG_ERR("Couldn't create timer fd: %s\n", strerror(errno));
+		printf("Couldn't create timer fd: %s\n", strerror(errno));
 		goto finish;
 	}
 	context->fds[SD_BUS_FD].events = POLLIN;
 	context->fds[BT_FD].events = POLLIN;
 	context->fds[TIMER_FD].events = POLLIN;
 
-	MSG_OUT("Entering polling loop\n");
+	printf("Entering polling loop\n");
 
 	while (running) {
 		polled = poll(context->fds, TOTAL_FDS, 1000);
@@ -731,29 +732,29 @@ int main(int argc, char *argv[]) {
 			continue;
 		if (polled < 0) {
 			r = -errno;
-			MSG_ERR("Error from poll(): %s\n", strerror(errno));
+			printf("Error from poll(): %s\n", strerror(errno));
 			goto finish;
 		}
 		r = dispatch_sd_bus(context);
 		if (r < 0) {
-			MSG_ERR("Error handling dbus event: %s\n", strerror(-r));
+			printf("Error handling dbus event: %s\n", strerror(-r));
 			goto finish;
 		}
 		r = dispatch_bt(context);
 		if (r < 0) {
-			MSG_ERR("Error handling BT event: %s\n", strerror(-r));
+			printf("Error handling BT event: %s\n", strerror(-r));
 			goto finish;
 		}
 		r = dispatch_timer(context);
 		if (r < 0) {
-			MSG_ERR("Error handling timer event: %s\n", strerror(-r));
+			printf("Error handling timer event: %s\n", strerror(-r));
 			goto finish;
 		}
 	}
 
 finish:
 	if (bt_q_get_head(context)) {
-		MSG_ERR("Unresponded BT Message!\n");
+		printf("Unresponded BT Message!\n");
 		while (bt_q_dequeue(context));
 	}
 	close(context->fds[BT_FD].fd);

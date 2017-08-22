@@ -177,11 +177,13 @@ static struct bt_queue *bt_q_enqueue(struct btbridged_context *context, uint8_t 
 	n->req.lun = bt_data[1] & 0x3;
 	n->req.seq = bt_data[2];
 	n->req.cmd = bt_data[3];
+#if 0
 	if (clock_gettime(CLOCK_MONOTONIC, &n->start) == -1) {
 		MSG_ERR("Couldn't clock_gettime(): %s\n", strerror(errno));
 		free(n);
 		return NULL;
 	}
+#endif
 	if (!bt_q) {
 		context->bt_q = n;
 	} else {
@@ -520,8 +522,9 @@ static int dispatch_bt(struct btbridged_context *context)
 			struct itimerspec ts;
 			/*
 			 * Enqueued onto an empty list, setup a timer for sending a
-			 * timeout
+			 * timeout  TODO!!
 			 */
+#if 0
 			ts.it_interval.tv_sec = 0;
 			ts.it_interval.tv_nsec = 0;
 			ts.it_value.tv_nsec = 0;
@@ -529,6 +532,7 @@ static int dispatch_bt(struct btbridged_context *context)
 			r = timerfd_settime(context->fds[TIMER_FD].fd, 0, &ts, NULL);
 			if (r == -1)
 				MSG_ERR("Couldn't set timerfd\n");
+#endif
 		}
 
 		r = sd_bus_message_new_signal(context->bus, &msg, OBJ_NAME, DBUS_NAME, "ReceivedMessage");

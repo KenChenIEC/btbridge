@@ -292,6 +292,7 @@ static int method_send_message(sd_bus_message *msg, void *userdata, sd_bus_error
 	 */
 	int r = 1;
 
+	printf("test point 5\n");
 	context = (struct btbridged_context *)userdata;
 	if (!context) {
 		sd_bus_error_set_const(ret_error, "org.openbmc.error", "Internal error");
@@ -345,6 +346,7 @@ static int bt_host_write(struct btbridged_context *context, struct bt_queue *bt_
 	sd_bus_message *msg = NULL;
 	int r = 0, len;
 
+	printf("test point 4\n");
 	assert(context);
 
 	if (!bt_msg)
@@ -436,6 +438,7 @@ out:
 static int dispatch_timer(struct btbridged_context *context)
 {
 	int r = 0;
+	printf("test point 3\n");
 	if (context->fds[TIMER_FD].revents & POLLIN) {
 		sd_bus_message *msg;
 		struct bt_queue *head;
@@ -481,6 +484,7 @@ static int dispatch_timer(struct btbridged_context *context)
 static int dispatch_sd_bus(struct btbridged_context *context)
 {
 	int r = 0;
+	printf("test point 2\n");
 	if (context->fds[SD_BUS_FD].revents) {
 		r = sd_bus_process(context->bus, NULL);
 		if (r > 0)
@@ -496,7 +500,7 @@ static int dispatch_bt(struct btbridged_context *context)
 	int r = 0;
 
 	assert(context);
-
+	printf("test point 1\n");
 	if (context->fds[BT_FD].revents & POLLIN) {
 		sd_bus_message *msg;
 		struct bt_queue *new;
